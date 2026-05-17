@@ -92,7 +92,7 @@ func HashPubKey(pubKey []byte) []byte {
 	publicSHA256 := sha256.Sum256(pubKey)
 	// ripemd160 is deprecated; replacing with double-SHA256 for a modern baseline
 	hash2 := sha256.Sum256(publicSHA256[:])
-	return hash2[:]
+	return hash2[:20] // Truncate to 20 bytes to preserve 25-byte address length and "D" prefix
 }
 
 func checksum(payload []byte) []byte {
@@ -112,7 +112,7 @@ func PubKeyToAddress(pubKey *ecdsa.PublicKey) string {
 func AddressToPubKeyHash(address string) []byte {
 	decoded := decodeBase58(address)
 	if len(decoded) < addressChecksumLen+1 {
-		panic("invalid address: decoded length is too short")
+		panic("invalid address: the decoded length is too short")
 	}
 
 	version := decoded[0]

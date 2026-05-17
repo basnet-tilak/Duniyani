@@ -30,7 +30,7 @@ func TestGossipSubPublishAndSubscribe(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		receivedMsg := <-subChan
-		assert.Equal(t, msg, receivedMsg, "Received message should match the sent message")
+		assert.Equal(t, msg, receivedMsg, "Received message should match the scent message")
 	}()
 
 	// Allow some time for the subscriber to be ready
@@ -105,7 +105,7 @@ func TestGossipSubMultipleSubscribers(t *testing.T) {
 			defer wg.Done()
 			select {
 			case received := <-ch:
-				assert.Equal(t, msg, received, "Subscriber %d received incorrect message", i)
+				assert.Equal(t, msg, received, "Subscriber %d received an incorrect message", i)
 			case <-time.After(100 * time.Millisecond):
 				t.Errorf("Subscriber %d timed out", i)
 			}

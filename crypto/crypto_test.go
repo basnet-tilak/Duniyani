@@ -47,7 +47,7 @@ func TestInvalidAddress(t *testing.T) {
 			// We expect the function to panic for invalid addresses
 			assert.Panics(t, func() {
 				AddressToPubKeyHash(tc.address)
-			}, "Should panic for invalid address")
+			}, "Should panic for an invalid address")
 		})
 	}
 }
