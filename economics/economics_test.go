@@ -15,7 +15,7 @@ func TestCoinbaseTransaction(t *testing.T) {
 	addr := w.GetAddress()
 	data := "test coinbase"
 
-	tx := NewCoinbaseTX(addr, data, 1)
+	tx := NewCoinbaseTx(addr, data, 1)
 
 	require.NotNil(t, tx, "Coinbase transaction should not be nil")
 	assert.True(t, tx.IsCoinbase(), "Transaction should be a coinbase transaction")

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/basnet-tilak/Duniyani/types"
+	"github.com/basnet-tilak/Duniyani/core"
 )
 
 // StateDB defines a minimal state persistence interface.
@@ -18,20 +18,20 @@ type StateDB interface {
 // Mempool holds pending transactions for the node.
 type Mempool struct {
 	mu           sync.RWMutex
-	transactions map[string]*types.Transaction
+	transactions map[string]*core.Transaction
 }
 
 // NewMempool creates a new state-aware mempool.
 func NewMempool() *Mempool {
-	return &Mempool{transactions: make(map[string]*types.Transaction)}
+	return &Mempool{transactions: make(map[string]*core.Transaction)}
 }
 
 // Add inserts a transaction after basic validation.
-func (m *Mempool) Add(tx *types.Transaction) error {
+func (m *Mempool) Add(tx *core.Transaction) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if tx == nil || tx.Value == 0 || len(tx.Signature) == 0 {
+	if tx == nil || len(tx.Vin) == 0 || len(tx.Vout) == 0 {
 		return fmt.Errorf("invalid transaction")
 	}
 
@@ -45,11 +45,11 @@ func (m *Mempool) Add(tx *types.Transaction) error {
 }
 
 // GetAll returns all mempool transactions.
-func (m *Mempool) GetAll() []*types.Transaction {
+func (m *Mempool) GetAll() []*core.Transaction {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	txs := make([]*types.Transaction, 0, len(m.transactions))
+	txs := make([]*core.Transaction, 0, len(m.transactions))
 	for _, tx := range m.transactions {
 		txs = append(txs, tx)
 	}
@@ -60,5 +60,5 @@ func (m *Mempool) GetAll() []*types.Transaction {
 func (m *Mempool) Clear() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.transactions = make(map[string]*types.Transaction)
+	m.transactions = make(map[string]*core.Transaction)
 }

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/basnet-tilak/Duniyani/types"
+	"github.com/basnet-tilak/Duniyani/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,18 +14,18 @@ import (
 func TestMempoolAddAndGet(t *testing.T) {
 	t.Parallel()
 
-	tx1 := &types.Transaction{Value: 1, Signature: []byte("sig1")}
-	tx2 := &types.Transaction{Value: 2, Signature: []byte("sig2")}
+	tx1 := &core.Transaction{Vin: []core.TxInput{{}}, Vout: []core.TxOutput{{}}}
+	tx2 := &core.Transaction{Vin: []core.TxInput{{}, {}}, Vout: []core.TxOutput{{}}}
 
 	testCases := []struct {
 		name        string
-		tx          *types.Transaction
+		tx          *core.Transaction
 		expectError bool
 	}{
 		{"Add a new transaction", tx1, false},
 		{"Add duplicate transaction", tx1, true},
 		{"Add another new transaction", tx2, false},
-		{"Add transaction with no signature", &types.Transaction{Value: 3}, true},
+		{"Add transaction with no inputs or outputs", &core.Transaction{Vout: []core.TxOutput{{}}}, true},
 	}
 
 	mempool := NewMempool()
@@ -71,9 +71,9 @@ func TestMempoolConcurrency(t *testing.T) {
 			defer wg.Done()
 
 			// Create a unique transaction for each goroutine.
-			tx := &types.Transaction{
-				Value:     uint64(i),
-				Signature: []byte{byte(i)}, // Simple signature for testing
+			tx := &core.Transaction{
+				Vin:  []core.TxInput{{Vout: i}},
+				Vout: []core.TxOutput{{Value: int64(i)}},
 			}
 
 			// Mix of operations: Add, GetAll, Clear
