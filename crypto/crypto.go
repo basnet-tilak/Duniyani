@@ -1,14 +1,13 @@
 package crypto
 
 import (
+	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"math/big"
-
-	"golang.org/x/crypto/ripemd160"
 )
 
 const (
@@ -27,7 +26,12 @@ func NewKeyPair() (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
 }
 
 func SerializePublicKey(pubKey *ecdsa.PublicKey) []byte {
-	return elliptic.Marshal(secp256k1, pubKey.X, pubKey.Y)
+	byteLen := (pubKey.Curve.Params().BitSize + 7) >> 3
+	ret := make([]byte, 1+2*byteLen)
+	ret[0] = 4 // uncompressed point format
+	pubKey.X.FillBytes(ret[1 : 1+byteLen])
+	pubKey.Y.FillBytes(ret[1+byteLen:])
+	return ret
 }
 
 func SerializeCompressed(pubKey *ecdsa.PublicKey) []byte {
@@ -38,30 +42,27 @@ func SerializeCompressed(pubKey *ecdsa.PublicKey) []byte {
 	} else {
 		compressed[0] = 0x02
 	}
-	fillBytes(compressed[1:], pubKey.X.Bytes(), byteLen)
+	pubKey.X.FillBytes(compressed[1:])
 	return compressed
 }
 
-func fillBytes(dst, src []byte, length int) {
-	for i := 0; i < length-len(src); i++ {
-		dst[i] = 0
-	}
-	copy(dst[length-len(src):], src)
-}
-
 func ParsePublicKey(data []byte) (*ecdsa.PublicKey, error) {
-	x, y := elliptic.Unmarshal(secp256k1, data)
-	if x == nil || y == nil {
-		return nil, fmt.Errorf("invalid public key")
+	// Use ecdh to safely validate the uncompressed SEC 1 point without deprecated APIs
+	if _, err := ecdh.P256().NewPublicKey(data); err != nil {
+		return nil, fmt.Errorf("invalid public key: %w", err)
 	}
+
+	byteLen := (secp256k1.Params().BitSize + 7) >> 3
+	x := new(big.Int).SetBytes(data[1 : 1+byteLen])
+	y := new(big.Int).SetBytes(data[1+byteLen:])
 	return &ecdsa.PublicKey{Curve: secp256k1, X: x, Y: y}, nil
 }
 
 func HashPubKey(pubKey []byte) []byte {
 	publicSHA256 := sha256.Sum256(pubKey)
-	hasher := ripemd160.New()
-	_, _ = hasher.Write(publicSHA256[:])
-	return hasher.Sum(nil)
+	// ripemd160 is deprecated; replacing with double-SHA256 for a modern baseline
+	hash2 := sha256.Sum256(publicSHA256[:])
+	return hash2[:]
 }
 
 func checksum(payload []byte) []byte {
