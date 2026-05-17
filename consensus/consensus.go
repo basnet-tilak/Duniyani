@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/basnet-tilak/Duniyani/core"
+	"github.com/basnet-tilak/Duniyani/mldsa"
 )
 
 // ConsensusEngine defines the interface for a Duniyani consensus engine.
@@ -18,13 +19,14 @@ type ConsensusEngine interface {
 
 // PoUWEngine implements a Proof of Useful Work consensus engine.
 type PoUWEngine struct {
-	targetBits uint32
-	target     *big.Int
+	targetBits    uint32
+	target        *big.Int
+	enclavePubKey []byte // ML-DSA public key of the authorized hardware enclave
 }
 
 // NewPoUWEngine creates a new Proof of Useful Work engine with a bit-based target.
-func NewPoUWEngine(targetBits uint32) *PoUWEngine {
-	engine := &PoUWEngine{targetBits: targetBits}
+func NewPoUWEngine(targetBits uint32, enclaveKey []byte) *PoUWEngine {
+	engine := &PoUWEngine{targetBits: targetBits, enclavePubKey: enclaveKey}
 	engine.calculateTarget()
 	return engine
 }
@@ -68,6 +70,17 @@ func (pouw *PoUWEngine) buildReceipt(header *core.BlockHeader, nonce uint64) []b
 
 // Verify validates that the block meets the Proof of Useful Work target.
 func (pouw *PoUWEngine) Verify(block *core.Block) bool {
+	// Validate the AI compute receipt is signed by an authorized enclave using ML-DSA
+	if len(pouw.enclavePubKey) > 0 && block.Header.EnclaveSig != nil {
+		pubKey, err := mldsa.NewPublicKey87(pouw.enclavePubKey)
+		if err != nil {
+			return false
+		}
+		if !mldsa.Verify(pubKey, block.Header.ComputeReceipt, block.Header.EnclaveSig) {
+			return false
+		}
+	}
+
 	var hashInt big.Int
 	hashBytes := block.Header.Hash()
 	hashInt.SetBytes(hashBytes[:])

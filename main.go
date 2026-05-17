@@ -78,7 +78,9 @@ func main() {
 
 	mempool := network.NewMempool(db)
 	net := network.NewNetworkNode(defaultPeers, bc, mempool)
-	engine := consensus.NewPoUWEngine(20)
+
+	// Initialize PoUW Consensus with a mock Enclave ML-DSA Public Key (empty for local dev)
+	engine := consensus.NewPoUWEngine(20, []byte{})
 
 	node := &Node{
 		bc:        bc,
@@ -96,6 +98,9 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			if err := node.net.ListenQUIC(); err != nil {
+				log.Fatalf("QUIC listener failed: %v", err)
+			}
 			node.net.Start(ctx)
 		}()
 
