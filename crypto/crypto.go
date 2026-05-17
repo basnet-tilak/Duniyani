@@ -1,11 +1,11 @@
 package crypto
 
 import (
-	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
 	"fmt"
 	"math/big"
 )
@@ -17,6 +17,23 @@ const (
 
 var secp256k1 elliptic.Curve = elliptic.P256()
 
+var p256SPKIPrefix []byte
+
+func init() {
+	// Dynamically generate the SPKI prefix for P-256 to avoid using deprecated ecdsa/elliptic fields.
+	priv, err := ecdsa.GenerateKey(secp256k1, rand.Reader)
+	if err != nil {
+		panic(err)
+	}
+	der, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
+	if err != nil {
+		panic(err)
+	}
+	// The uncompressed SEC 1 point is always 65 bytes for P-256
+	prefixLen := len(der) - 65
+	p256SPKIPrefix = der[:prefixLen:prefixLen] // force cap = len to prevent append races
+}
+
 func NewKeyPair() (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
 	privKey, err := ecdsa.GenerateKey(secp256k1, rand.Reader)
 	if err != nil {
@@ -26,36 +43,49 @@ func NewKeyPair() (*ecdsa.PrivateKey, *ecdsa.PublicKey) {
 }
 
 func SerializePublicKey(pubKey *ecdsa.PublicKey) []byte {
-	byteLen := (pubKey.Curve.Params().BitSize + 7) >> 3
-	ret := make([]byte, 1+2*byteLen)
-	ret[0] = 4 // uncompressed point format
-	pubKey.X.FillBytes(ret[1 : 1+byteLen])
-	pubKey.Y.FillBytes(ret[1+byteLen:])
-	return ret
+	ecdhKey, err := pubKey.ECDH()
+	if err != nil {
+		panic(err)
+	}
+	return ecdhKey.Bytes()
 }
 
 func SerializeCompressed(pubKey *ecdsa.PublicKey) []byte {
-	byteLen := (pubKey.Curve.Params().BitSize + 7) >> 3
+	ecdhKey, err := pubKey.ECDH()
+	if err != nil {
+		panic(err)
+	}
+	bytes := ecdhKey.Bytes()
+	byteLen := (len(bytes) - 1) / 2
 	compressed := make([]byte, 1+byteLen)
-	if pubKey.Y.Bit(0) == 1 {
+
+	// The last byte of the uncompressed serialization is the last byte of Y.
+	// We use it to determine the sign (odd/even).
+	if bytes[len(bytes)-1]&1 == 1 {
 		compressed[0] = 0x03
 	} else {
 		compressed[0] = 0x02
 	}
-	pubKey.X.FillBytes(compressed[1:])
+	copy(compressed[1:], bytes[1:1+byteLen])
 	return compressed
 }
 
 func ParsePublicKey(data []byte) (*ecdsa.PublicKey, error) {
-	// Use ecdh to safely validate the uncompressed SEC 1 point without deprecated APIs
-	if _, err := ecdh.P256().NewPublicKey(data); err != nil {
-		return nil, fmt.Errorf("invalid public key: %w", err)
+	if len(data) != 65 || data[0] != 4 {
+		return nil, fmt.Errorf("invalid public key length or format")
 	}
 
-	byteLen := (secp256k1.Params().BitSize + 7) >> 3
-	x := new(big.Int).SetBytes(data[1 : 1+byteLen])
-	y := new(big.Int).SetBytes(data[1+byteLen:])
-	return &ecdsa.PublicKey{Curve: secp256k1, X: x, Y: y}, nil
+	der := append(p256SPKIPrefix, data...)
+	pub, err := x509.ParsePKIXPublicKey(der)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse public key: %w", err)
+	}
+
+	ecdsaPub, ok := pub.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("not an ECDSA public key")
+	}
+	return ecdsaPub, nil
 }
 
 func HashPubKey(pubKey []byte) []byte {
