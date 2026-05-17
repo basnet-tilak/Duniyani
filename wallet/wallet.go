@@ -37,7 +37,7 @@ func (w *Wallet) SignTransaction(tx *core.Transaction, prevTxs map[string]core.T
 	for inID, vin := range tx.Vin {
 		prevTx, ok := prevTxs[string(vin.TxID)]
 		if !ok {
-			return fmt.Errorf("previous transaction not found for input %d", inID)
+			return fmt.Errorf("previous transaction isn't found for input %d", inID)
 		}
 
 		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash
@@ -68,7 +68,7 @@ func VerifyTransaction(tx *core.Transaction, prevTxs map[string]core.Transaction
 	for inID, vin := range tx.Vin {
 		prevTx, ok := prevTxs[string(vin.TxID)]
 		if !ok {
-			return false, fmt.Errorf("previous transaction not found for input %d", inID)
+			return false, fmt.Errorf("previous transaction isn't found for input %d", inID)
 		}
 
 		txCopy.Vin[inID].PubKey = prevTx.Vout[vin.Vout].PubKeyHash

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -59,7 +60,7 @@ func main() {
 	bc, err := core.LoadBlockchain(db)
 	if err != nil {
 		blockchainErr := err
-		if err == database.ErrNotFound {
+		if errors.Is(err, database.ErrNotFound) {
 			log.Println("No existing blockchain found. Creating genesis block...")
 			genesis := economics.CreateGenesisBlock(w.GetAddress())
 			bc, err = core.CreateBlockchain(db, genesis)
@@ -124,12 +125,17 @@ func (n *Node) startMining(ctx context.Context, minerAddress string) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Mining loop received shutdown signal.")
+			log.Println("Mining loop received a shutdown signal.")
 			return
 		default:
 			lastBlockHash := n.bc.GetLastBlockHash()
 			coinbaseTx := economics.NewCoinbaseTx(minerAddress, "", n.bc.Height()+1)
-			txs := []*core.Transaction{coinbaseTx}
+
+			// Retrieve pending transactions from the mempool
+			mempoolTxs := n.mempool.GetTransactions()
+			txs := make([]*core.Transaction, 0, len(mempoolTxs)+1)
+			txs = append(txs, coinbaseTx)
+			txs = append(txs, mempoolTxs...)
 
 			newBlock := core.NewBlock(txs, lastBlockHash, 1, n.consensus.DifficultyTarget())
 
@@ -139,8 +145,16 @@ func (n *Node) startMining(ctx context.Context, minerAddress string) {
 			}
 
 			if err := n.bc.AddBlock(newBlock); err != nil {
-				log.Printf("Failed to add new block: %v", err)
+				log.Printf("Failed to add a new block: %v", err)
 				continue
+			}
+
+			// Broadcast the newly mined block to the network
+			n.net.BroadcastBlock(newBlock)
+
+			// Evict included transactions from the mempool
+			for _, tx := range mempoolTxs {
+				n.mempool.RemoveTransaction(tx.ID)
 			}
 
 			log.Printf("Mined new block: %x", newBlock.Header.Hash())

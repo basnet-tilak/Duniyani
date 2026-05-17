@@ -26,7 +26,13 @@ func NewMerkleNode(left, right *MerkleNode, data []byte) *MerkleNode {
 		node.Data = hash[:]
 	} else {
 		// This is an internal node, so we concatenate and hash the data of children.
-		prevHashes := append(left.Data, right.Data...)
+		var prevHashes []byte
+		if left != nil {
+			prevHashes = append(prevHashes, left.Data...)
+		}
+		if right != nil {
+			prevHashes = append(prevHashes, right.Data...)
+		}
 		hash := sha256.Sum256(prevHashes)
 		node.Data = hash[:]
 	}

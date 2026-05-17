@@ -34,17 +34,17 @@ type Database struct {
 func InitDatabase(dirPath string) (*Database, func()) {
 	path := filepath.Join(dirPath, "duniyani_store.gob")
 	if err := os.MkdirAll(dirPath, 0o755); err != nil {
-		panic(fmt.Errorf("failed to create database directory: %w", err))
+		panic(fmt.Errorf("failed to create a database directory: %w", err))
 	}
 
 	db := &Database{path: path, store: make(map[string][]byte)}
 	if err := db.load(); err != nil {
-		panic(fmt.Errorf("failed to load database: %w", err))
+		panic(fmt.Errorf("failed to load a database: %w", err))
 	}
 
 	closeFunc := func() {
 		if err := db.save(); err != nil {
-			panic(fmt.Errorf("failed to save database: %w", err))
+			panic(fmt.Errorf("failed to save a database: %w", err))
 		}
 	}
 
@@ -70,7 +70,12 @@ func (db *Database) load() error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
 
 	decoder := gob.NewDecoder(file)
 	return decoder.Decode(&db.store)
@@ -84,7 +89,12 @@ func (db *Database) save() error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
 
 	encoder := gob.NewEncoder(file)
 	return encoder.Encode(db.store)
