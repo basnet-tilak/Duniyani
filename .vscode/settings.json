@@ -1,0 +1,12 @@
+{
+    "editor.formatOnSave": true,
+    "files.autoSave": "afterDelay",
+    "editor.wordWrap": "wordWrapColumn",
+    "editor.autoIndentOnPaste": true,
+    "editor.codeActions.triggerOnFocusChange": true,
+    "editor.bracketPairColorization.independentColorPoolPerBracketType": true,
+    "window.autoDetectColorScheme": true,
+    "chat.editor.wordWrap": "on",
+    "chat.editing.explainChanges.enabled": true,
+    "inlineChat.affordance": "editor"
+}

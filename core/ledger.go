@@ -2,10 +2,10 @@ package core
 
 import (
 	"bytes"
+	"crypto/sha3"
 	"encoding/gob"
 
-	"github.com/basnet-tilak/Duniyani/mldsa"
-	"golang.org/x/crypto/sha3"
+	"github.com/basnet-tilak/Duniyani/core/mldsa"
 )
 
 // TxInput references a previous UTXO and provides the ML-DSA signature.
