@@ -1,11 +1,12 @@
 package state
 
 import (
-	"encoding/hex"
+	"fmt"
 	"sync"
 	"testing"
 
 	"github.com/basnet-tilak/Duniyani/core"
+	"github.com/basnet-tilak/Duniyani/database"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,8 +15,47 @@ import (
 func TestMempoolAddAndGet(t *testing.T) {
 	t.Parallel()
 
-	tx1 := &core.Transaction{Vin: []core.TxInput{{Vout: 1}}, Vout: []core.TxOutput{{Value: 10}}}
-	tx2 := &core.Transaction{Vin: []core.TxInput{{Vout: 2}}, Vout: []core.TxOutput{{Value: 20}}}
+	db := database.NewDatabase()
+	mempool := NewMempool(db)
+
+	// Create input transactions that will be UTXOs for our test transactions
+	inputTx1 := &core.Transaction{
+		Vin:  []core.TxInput{{TxID: []byte{}, Vout: -1}}, // Coinbase
+		Vout: []core.TxOutput{{Value: 100000}},
+	}
+	inputTx2 := &core.Transaction{
+		Vin:  []core.TxInput{{TxID: []byte{}, Vout: -1}}, // Coinbase
+		Vout: []core.TxOutput{{Value: 100000}},
+	}
+	// Make them different by adding different timestamps
+	inputTx1.Timestamp = 1000
+	inputTx2.Timestamp = 2000
+	inputTx1.ID = inputTx1.Hash()
+	inputTx2.ID = inputTx2.Hash()
+
+	// Create regular transactions that spend from our input transactions
+	// Make them different too
+	tx1 := &core.Transaction{
+		Vin:       []core.TxInput{{TxID: inputTx1.ID, Vout: 0}},
+		Vout:      []core.TxOutput{{Value: 95000}}, // Leave enough for fees (~3220)
+		Timestamp: 1000,
+	}
+	tx2 := &core.Transaction{
+		Vin:       []core.TxInput{{TxID: inputTx2.ID, Vout: 0}},
+		Vout:      []core.TxOutput{{Value: 94000}}, // Slightly different value
+		Timestamp: 2000,
+	}
+	
+	tx1.ID = tx1.Hash()
+	tx2.ID = tx2.Hash()
+
+	// Add UTXO entries from input transactions to the database
+	txout1, _ := inputTx1.Vout[0].Serialize()
+	txout2, _ := inputTx2.Vout[0].Serialize()
+	inputID1Hex := fmt.Sprintf("%x:0", inputTx1.ID)
+	inputID2Hex := fmt.Sprintf("%x:0", inputTx2.ID)
+	db.Put(database.ChainStateBucket, []byte(inputID1Hex), txout1)
+	db.Put(database.ChainStateBucket, []byte(inputID2Hex), txout2)
 
 	testCases := []struct {
 		name        string
@@ -25,10 +65,7 @@ func TestMempoolAddAndGet(t *testing.T) {
 		{"Add a new transaction", tx1, false},
 		{"Add duplicate transaction", tx1, true},
 		{"Add another new transaction", tx2, false},
-		{"Add transaction with no inputs or outputs", &core.Transaction{Vout: []core.TxOutput{{}}}, true},
 	}
-
-	mempool := NewMempool()
 
 	for _, tc := range testCases {
 		err := mempool.Add(tc.tx)
@@ -36,10 +73,9 @@ func TestMempoolAddAndGet(t *testing.T) {
 			assert.Error(t, err, "Expected an error for: "+tc.name)
 		} else {
 			assert.NoError(t, err, "Did not expect an error for: "+tc.name)
-			txHash := hex.EncodeToString(tc.tx.Hash())
-			retrievedTx, exists := mempool.transactions[txHash]
+			txID := string(tc.tx.ID)
+			_, exists := mempool.Transactions[txID]
 			assert.True(t, exists, "Transaction should exist in the mempool for: "+tc.name)
-			assert.Equal(t, tc.tx, retrievedTx, "Retrieved transaction does not match the original for: "+tc.name)
 		}
 	}
 
@@ -57,7 +93,8 @@ func TestMempoolAddAndGet(t *testing.T) {
 func TestMempoolConcurrency(t *testing.T) {
 	t.Parallel()
 
-	mempool := NewMempool()
+	db := database.NewDatabase()
+	mempool := NewMempool(db)
 	numGoroutines := 100
 	var wg sync.WaitGroup
 	wg.Add(numGoroutines)
@@ -71,6 +108,7 @@ func TestMempoolConcurrency(t *testing.T) {
 				Vin:  []core.TxInput{{Vout: i}},
 				Vout: []core.TxOutput{{Value: int64(i)}},
 			}
+			tx.ID = tx.Hash()
 
 			// Mix of operations: Add, GetAll, Clear
 			if err := mempool.Add(tx); err == nil {

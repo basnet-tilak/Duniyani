@@ -80,8 +80,8 @@ func main() {
 	mempool := network.NewMempool(db)
 	net := network.NewNetworkNode(defaultPeers, bc, mempool)
 
-	// Initialize PoUW Consensus with a mock Enclave ML-DSA Public Key (empty for local dev)
-	engine := consensus.NewPoUWEngine(20, []byte{})
+	// Initialize PoW Consensus
+	engine := consensus.NewPoWEngine(20)
 
 	node := &Node{
 		bc:        bc,

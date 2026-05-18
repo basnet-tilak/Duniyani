@@ -8,15 +8,9 @@ import (
 	"log"
 	"sync"
 
-	"crypto/mlkem"
-
 	"github.com/basnet-tilak/Duniyani/core"
 	"github.com/basnet-tilak/Duniyani/database"
-<<<<<<< HEAD
-	"github.com/quic-go/quic-go"
-=======
 	"github.com/basnet-tilak/Duniyani/economics"
->>>>>>> d9197b0be1326238bc1fa836f417cbdcb4125ebe
 )
 
 var (
@@ -68,16 +62,14 @@ type Peer struct {
 
 // NetworkNode simulates a libp2p-style node.
 type NetworkNode struct {
-	quicListener quic.Listener
-	kemDecaps    *mlkem.DecapsulationKey1024 // Post-quantum key encapsulation
-	addr         string
-	peers        map[string]*Peer
-	mu           sync.RWMutex
-	incoming     chan *Message
-	bc           *core.Blockchain
-	mempool      *Mempool
-	ctx          context.Context
-	cancel       context.CancelFunc
+	addr     string
+	peers    map[string]*Peer
+	mu       sync.RWMutex
+	incoming chan *Message
+	bc       *core.Blockchain
+	mempool  *Mempool
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 // NewNetworkNode creates a network node instance.
@@ -346,23 +338,11 @@ func (m *Mempool) AddTransaction(tx *core.Transaction) error {
 		return fmt.Errorf("transaction %s already in mempool", txID)
 	}
 
-<<<<<<< HEAD
-	if !tx.Verify() {
-		return fmt.Errorf("invalid ML-DSA signature for transaction %s", txID)
-	}
-
-	for _, vin := range tx.Vin {
-		key := []byte(fmt.Sprintf("%x:%d", vin.TxID, vin.Vout))
-		_, err := m.db.Get(database.ChainStateBucket, key)
-		if err == nil {
-			return fmt.Errorf("potential double-spend detected for tx %s", txID)
-=======
 	// Track UTXOs already spent by transactions currently in the mempool
 	spentInMempool := make(map[string]bool)
 	for _, memTx := range m.transactions {
 		for _, vin := range memTx.Vin {
 			spentInMempool[fmt.Sprintf("%x:%d", vin.TxID, vin.Vout)] = true
->>>>>>> d9197b0be1326238bc1fa836f417cbdcb4125ebe
 		}
 	}
 

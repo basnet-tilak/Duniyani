@@ -42,7 +42,8 @@ func NewCoinbaseTx(toAddress, data string, height uint64) *core.Transaction {
 		PubKey:    []byte(data),
 	}
 
-	pubKeyHash := crypto.AddressToPubKeyHash(toAddress)
+	// Convert address string to pubkeyhash using SHA256 hash of the address
+	pubKeyHash := crypto.HashPubKey([]byte(toAddress))
 	reward := BlockReward(height)
 	if height == 0 {
 		reward = GenesisCoinbaseAmount

@@ -15,8 +15,8 @@ func TestTransactionHashing(t *testing.T) {
 	}
 	hash := tx.Hash()
 
-	// SHA3-384 generates a 48 byte hash length
-	assert.Len(t, hash, 48)
+	// SHA256 generates a 32 byte hash length
+	assert.Len(t, hash, 32)
 }
 
 func TestBlockCreationAndHashing(t *testing.T) {
@@ -29,10 +29,10 @@ func TestBlockCreationAndHashing(t *testing.T) {
 	block := NewBlock([]*Transaction{tx}, []byte("prevHash"), 1, 10)
 	require.NotNil(t, block)
 	assert.Equal(t, uint32(1), block.Header.Version)
-	assert.Len(t, block.Header.MerkleRoot, 48)
+	assert.Len(t, block.Header.MerkleRoot, 32)
 
 	hash := block.Header.Hash()
-	assert.Len(t, hash, 48)
+	assert.Len(t, hash, 32)
 }
 
 func TestMerkleTree(t *testing.T) {
@@ -46,5 +46,5 @@ func TestMerkleTree(t *testing.T) {
 
 	require.NotNil(t, tree)
 	require.NotNil(t, tree.RootNode)
-	assert.Len(t, tree.RootNode.Data, 48)
+	assert.Len(t, tree.RootNode.Data, 32)
 }

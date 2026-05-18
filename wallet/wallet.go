@@ -1,43 +1,43 @@
 package wallet
 
 import (
+	"crypto/ecdsa"
+	"crypto/rand"
 	"encoding/hex"
-	"log"
+	"fmt"
 
-	"github.com/basnet-tilak/Duniyani/mldsa"
+	"github.com/basnet-tilak/Duniyani/core"
+	"github.com/basnet-tilak/Duniyani/crypto"
 	"golang.org/x/crypto/sha3"
 )
 
-// Wallet securely stores post-quantum keypairs for the Duniyani network.
+// Wallet securely stores ECDSA keypairs for the Duniyani network.
 type Wallet struct {
-	PrivateKey *mldsa.PrivateKey
-	PublicKey  *mldsa.PublicKey
+	PrivateKey *ecdsa.PrivateKey
+	PublicKey  *ecdsa.PublicKey
 }
 
-// NewWallet creates a new quantum-secure wallet.
+// NewWallet creates a new wallet.
 func NewWallet() *Wallet {
-	priv, err := mldsa.GenerateKey87(nil)
-	if err != nil {
-		log.Panicf("Failed to generate ML-DSA keypair: %v", err)
-	}
-
+	priv, pub := crypto.NewKeyPair()
 	return &Wallet{
 		PrivateKey: priv,
-		PublicKey:  priv.PublicKey(),
+		PublicKey:  pub,
 	}
 }
 
-// GetAddress returns the encoded Duniyani Quantum (DQ) address.
+// GetAddress returns the encoded Duniyani address.
 func (w *Wallet) GetAddress() string {
-	hash := sha3.Sum256(w.PublicKey.Bytes())
+	pubKeyBytes := crypto.SerializePublicKey(w.PublicKey)
+	hash := sha3.Sum256(pubKeyBytes)
 	return "DQ" + hex.EncodeToString(hash[:])
 }
 
-<<<<<<< HEAD
-// Sign generates an ML-DSA-87 signature for a given message.
+// Sign generates an ECDSA signature for a given message.
 func (w *Wallet) Sign(msg []byte) ([]byte, error) {
-	return mldsa.Sign(w.PrivateKey, msg), nil
-=======
+	return ecdsa.SignASN1(rand.Reader, w.PrivateKey, msg)
+}
+
 // SignTransaction signs each input of a transaction.
 func (w *Wallet) SignTransaction(tx *core.Transaction, prevTxs map[string]core.Transaction) error {
 	if tx.IsCoinbase() {
@@ -65,7 +65,7 @@ func (w *Wallet) SignTransaction(tx *core.Transaction, prevTxs map[string]core.T
 		txCopy.Vin[inID].PubKey = nil
 	}
 
-	tx.ID = tx.Hash()
+	tx.ID = txCopy.Hash()
 	return nil
 }
 
@@ -99,5 +99,4 @@ func VerifyTransaction(tx *core.Transaction, prevTxs map[string]core.Transaction
 	}
 
 	return true, nil
->>>>>>> d9197b0be1326238bc1fa836f417cbdcb4125ebe
 }

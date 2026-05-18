@@ -8,5 +8,19 @@
     "window.autoDetectColorScheme": true,
     "chat.editor.wordWrap": "on",
     "chat.editing.explainChanges.enabled": true,
-    "inlineChat.affordance": "editor"
+    "inlineChat.affordance": "editor",
+    "editor.minimap.enabled": true,
+    "workbench.editor.autoLockGroups": {
+        "terminalEditor": false
+    },
+    "workbench.editor.alwaysShowEditorActions": true,
+    "workbench.settings.editor": "json",
+    "workbench.settings.alwaysShowAdvancedSettings": true,
+    "workbench.settings.openDefaultSettings": true,
+    "terminal.explorerKind": "external",
+    "terminal.integrated.allowMnemonics": true,
+    "terminal.integrated.developer.devMode": true,
+    "terminal.integrated.env.linux": {
+        
+    }
 }
