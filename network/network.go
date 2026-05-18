@@ -12,7 +12,11 @@ import (
 
 	"github.com/basnet-tilak/Duniyani/core"
 	"github.com/basnet-tilak/Duniyani/database"
+<<<<<<< HEAD
 	"github.com/quic-go/quic-go"
+=======
+	"github.com/basnet-tilak/Duniyani/economics"
+>>>>>>> d9197b0be1326238bc1fa836f417cbdcb4125ebe
 )
 
 var (
@@ -27,7 +31,7 @@ type Message struct {
 	Payload []byte
 }
 
-// VersionMsg is exchanged during handshake.
+// VersionMsg is exchanged during a handshake.
 type VersionMsg struct {
 	Version    uint32
 	BestHeight int64
@@ -157,12 +161,55 @@ func (n *NetworkNode) SendToPeer(addr string, msg *Message) error {
 	}
 }
 
+// SendVersion uses NewMessage to create a version message and sends it to a peer.
+func (n *NetworkNode) SendVersion(addr string) {
+	payload := &VersionMsg{
+		Version:    1,
+		BestHeight: int64(n.bc.Height()),
+		AddrFrom:   n.addr,
+	}
+	msg, err := NewMessage(CmdVersion, payload)
+	if err != nil {
+		log.Printf("failed to create version message: %v", err)
+		return
+	}
+	_ = n.SendToPeer(addr, msg)
+}
+
+// BroadcastBlock uses NewMessage to create a block message and sends it to all peers.
+func (n *NetworkNode) BroadcastBlock(block *core.Block) {
+	msg, err := NewMessage(CmdBlock, &BlockMsg{Block: block})
+	if err != nil {
+		log.Printf("failed to create block message: %v", err)
+		return
+	}
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	for addr := range n.peers {
+		_ = n.SendToPeer(addr, msg)
+	}
+}
+
+// BroadcastTx uses NewMessage to create a transaction message and sends it to all peers.
+func (n *NetworkNode) BroadcastTx(tx *core.Transaction) {
+	msg, err := NewMessage(CmdTx, &TxMsg{Tx: tx})
+	if err != nil {
+		log.Printf("failed to create tx message: %v", err)
+		return
+	}
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	for addr := range n.peers {
+		_ = n.SendToPeer(addr, msg)
+	}
+}
+
 // Receive enqueues an inbound message.
 func (n *NetworkNode) Receive(msg *Message) {
 	select {
 	case n.incoming <- msg:
 	default:
-		log.Println("incoming queue full, dropping message")
+		log.Println("incoming queue full, dropping a message")
 	}
 }
 
@@ -173,7 +220,7 @@ func (n *NetworkNode) handleMessage(msg *Message) error {
 		if err := decodePayload(msg.Payload, &version); err != nil {
 			return err
 		}
-		log.Printf("received version from %s height=%d", version.AddrFrom, version.BestHeight)
+		log.Printf("received a version from %s height=%d", version.AddrFrom, version.BestHeight)
 	case string(CmdTx):
 		var txMsg TxMsg
 		if err := decodePayload(msg.Payload, &txMsg); err != nil {
@@ -287,6 +334,10 @@ func NewMempool(db *database.Database) *Mempool {
 
 // AddTransaction adds a transaction to the mempool after validation.
 func (m *Mempool) AddTransaction(tx *core.Transaction) error {
+	if tx.IsCoinbase() {
+		return fmt.Errorf("coinbase transactions cannot be added to the mempool")
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -295,6 +346,7 @@ func (m *Mempool) AddTransaction(tx *core.Transaction) error {
 		return fmt.Errorf("transaction %s already in mempool", txID)
 	}
 
+<<<<<<< HEAD
 	if !tx.Verify() {
 		return fmt.Errorf("invalid ML-DSA signature for transaction %s", txID)
 	}
@@ -304,7 +356,53 @@ func (m *Mempool) AddTransaction(tx *core.Transaction) error {
 		_, err := m.db.Get(database.ChainStateBucket, key)
 		if err == nil {
 			return fmt.Errorf("potential double-spend detected for tx %s", txID)
+=======
+	// Track UTXOs already spent by transactions currently in the mempool
+	spentInMempool := make(map[string]bool)
+	for _, memTx := range m.transactions {
+		for _, vin := range memTx.Vin {
+			spentInMempool[fmt.Sprintf("%x:%d", vin.TxID, vin.Vout)] = true
+>>>>>>> d9197b0be1326238bc1fa836f417cbdcb4125ebe
 		}
+	}
+
+	var inputSum int64
+	for _, vin := range tx.Vin {
+		utxoKey := fmt.Sprintf("%x:%d", vin.TxID, vin.Vout)
+		if spentInMempool[utxoKey] {
+			return fmt.Errorf("potential double-spend: UTXO %s is already spent in mempool", utxoKey)
+		}
+
+		key := []byte(utxoKey)
+		val, err := m.db.Get(database.ChainStateBucket, key)
+		if err != nil {
+			return fmt.Errorf("input %s not found in UTXO set (already spent or invalid)", utxoKey)
+		}
+
+		utxo, err := core.DeserializeTxOutput(val)
+		if err != nil {
+			return fmt.Errorf("failed to deserialize UTXO %s", utxoKey)
+		}
+		inputSum += utxo.Value
+	}
+
+	var outputSum int64
+	for _, vout := range tx.Vout {
+		outputSum += vout.Value
+	}
+
+	providedFee := inputSum - outputSum
+	if providedFee < 0 {
+		return fmt.Errorf("transaction %s has negative fee: outputs exceed inputs", txID)
+	}
+
+	requiredFee, err := economics.CalculateTransactionFee(tx, len(m.transactions))
+	if err != nil {
+		return fmt.Errorf("failed to calculate required fee: %w", err)
+	}
+
+	if providedFee < requiredFee {
+		return fmt.Errorf("transaction %s fee is too low: provided %d, required %d", txID, providedFee, requiredFee)
 	}
 
 	m.transactions[txID] = tx

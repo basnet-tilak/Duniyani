@@ -29,7 +29,7 @@ func BlockReward(height uint64) int64 {
 	return int64(reward)
 }
 
-// NewCoinbaseTx creates a new coinbase transaction with dynamic reward.
+// NewCoinbaseTx creates a new coinbase transaction with a dynamic reward.
 func NewCoinbaseTx(toAddress, data string, height uint64) *core.Transaction {
 	if data == "" {
 		data = "Duniyani miner reward"

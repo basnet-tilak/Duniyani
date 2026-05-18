@@ -14,8 +14,8 @@ import (
 func TestMempoolAddAndGet(t *testing.T) {
 	t.Parallel()
 
-	tx1 := &core.Transaction{Vin: []core.TxInput{{}}, Vout: []core.TxOutput{{}}}
-	tx2 := &core.Transaction{Vin: []core.TxInput{{}, {}}, Vout: []core.TxOutput{{}}}
+	tx1 := &core.Transaction{Vin: []core.TxInput{{Vout: 1}}, Vout: []core.TxOutput{{Value: 10}}}
+	tx2 := &core.Transaction{Vin: []core.TxInput{{Vout: 2}}, Vout: []core.TxOutput{{Value: 20}}}
 
 	testCases := []struct {
 		name        string
@@ -31,20 +31,16 @@ func TestMempoolAddAndGet(t *testing.T) {
 	mempool := NewMempool()
 
 	for _, tc := range testCases {
-		tc := tc // Capture range variable
-		t.Run(tc.name, func(t *testing.T) {
-			// Note: Sub-tests here are sequential because they depend on shared mempool state.
-			err := mempool.Add(tc.tx)
-			if tc.expectError {
-				assert.Error(t, err, "Expected an error but got none")
-			} else {
-				assert.NoError(t, err, "Did not expect an error but got one")
-				txHash := hex.EncodeToString(tc.tx.Hash())
-				retrievedTx, exists := mempool.transactions[txHash]
-				assert.True(t, exists, "Transaction should exist in the mempool")
-				assert.Equal(t, tc.tx, retrievedTx, "Retrieved transaction does not match the original")
-			}
-		})
+		err := mempool.Add(tc.tx)
+		if tc.expectError {
+			assert.Error(t, err, "Expected an error for: "+tc.name)
+		} else {
+			assert.NoError(t, err, "Did not expect an error for: "+tc.name)
+			txHash := hex.EncodeToString(tc.tx.Hash())
+			retrievedTx, exists := mempool.transactions[txHash]
+			assert.True(t, exists, "Transaction should exist in the mempool for: "+tc.name)
+			assert.Equal(t, tc.tx, retrievedTx, "Retrieved transaction does not match the original for: "+tc.name)
+		}
 	}
 
 	// Test GetAll
